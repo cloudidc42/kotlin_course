@@ -461,6 +461,84 @@ jobs:
 
 ---
 
+## Advanced CI Patterns
+
+```yaml
+# GitHub Actions: Dependency Review + SBOM Generation
+name: security-check
+on: [pull_request]
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause
+
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: cyclonedx-json
+          output-file: sbom.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+
+  # Reusable workflow call
+  call-build:
+    uses: ./.github/workflows/build.yml
+    with:
+      java-version: '21'
+      run-integration-tests: true
+    secrets:
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+```
+
+```kotlin
+// Kotlin: Verify deployment health after CI push
+suspend fun smokeTest(baseUrl: String): Boolean {
+    val client = io.ktor.client.HttpClient()
+    return try {
+        val response = client.get("$baseUrl/actuator/health")
+        val body = response.bodyAsText()
+        response.status.value == 200 && body.contains("\"status\":\"UP\"")
+    } catch (e: Exception) {
+        false
+    } finally {
+        client.close()
+    }
+}
+```
+
+## แบบฝึกหัด Part 38
+
+```
+1. เพิ่ม job "notify-slack" ใน GitHub Actions workflow
+   ที่ส่ง message เมื่อ deploy สำเร็จ/ล้มเหลว
+
+2. สร้าง reusable workflow (.github/workflows/build.yml)
+   รับ input: java-version, run-integration-tests
+   ให้ workflow หลัก call ผ่าน "uses:" syntax
+
+3. เพิ่ม dependency-review-action บน pull_request
+   block PR ถ้า dependency ใหม่มี license ที่ไม่อนุญาต
+
+4. ตั้งค่า branch protection rules:
+   - require status checks: build, test, lint
+   - require code review: 1 approver
+   - dismiss stale reviews on new commits
+```
+
+---
+
 ## สรุป Part 38
 
 ```

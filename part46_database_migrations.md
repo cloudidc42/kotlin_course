@@ -435,6 +435,77 @@ typealias DynamicPropertyRegistry = org.springframework.test.context.DynamicProp
 
 ---
 
+## Advanced Flyway Patterns
+
+```kotlin
+// Flyway Callbacks — ทำงานก่อน/หลัง migration
+
+import org.flywaydb.core.api.callback.Callback
+import org.flywaydb.core.api.callback.Context
+import org.flywaydb.core.api.callback.Event
+import org.springframework.stereotype.Component
+
+@Component
+class AuditMigrationCallback : Callback {
+    override fun supports(event: Event, context: Context): Boolean =
+        event in listOf(Event.AFTER_EACH_MIGRATE, Event.AFTER_MIGRATE_ERROR)
+    
+    override fun canHandleInTransaction(event: Event, context: Context) = true
+    
+    override fun handle(event: Event, context: Context) {
+        when (event) {
+            Event.AFTER_EACH_MIGRATE -> {
+                val info = context.migrateResult
+                println("✅ Migration applied: ${context.migrationInfo?.version}")
+            }
+            Event.AFTER_MIGRATE_ERROR -> {
+                println("❌ Migration failed: ${context.migrationInfo?.version}")
+                // alert team, trigger rollback notification
+            }
+            else -> {}
+        }
+    }
+    
+    override fun getCallbackName() = "AuditMigrationCallback"
+}
+
+// Conditional migration with Spring profile
+@Component
+class DataSeedMigration : BaseJavaMigration() {
+    // V999__Seed_test_data.kt only for dev/test
+    override fun migrate(context: org.flywaydb.core.api.migration.Context) {
+        if (System.getenv("SPRING_PROFILES_ACTIVE") !in listOf("dev", "test")) return
+        
+        context.connection.prepareStatement("""
+            INSERT INTO products (id, name, price) VALUES
+            ('p1', 'Test Product 1', 100.00),
+            ('p2', 'Test Product 2', 200.00)
+            ON CONFLICT DO NOTHING
+        """).execute()
+    }
+}
+```
+
+## แบบฝึกหัด Part 46
+
+```
+1. เขียน V2__Add_audit_columns.sql เพิ่ม created_by, updated_by, deleted_at
+   ไปยัง table ที่มีอยู่แล้ว โดยใช้ ALTER TABLE ... ADD COLUMN IF NOT EXISTS
+
+2. สร้าง R__refresh_views.sql สำหรับ materialized view
+   ที่ต้อง refresh ทุกครั้งที่ checksum เปลี่ยน
+
+3. เขียน Kotlin migration class สำหรับย้าย data
+   จาก column เก่า (full_name VARCHAR) ไปเป็น (first_name, last_name)
+
+4. ทดสอบ rollback strategy โดย:
+   - เพิ่ม migration ที่มี breaking change
+   - เขียน undo script
+   - ทดสอบด้วย Testcontainers
+```
+
+---
+
 ## สรุป Part 46
 
 ```

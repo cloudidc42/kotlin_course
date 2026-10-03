@@ -469,6 +469,75 @@ typealias CookieUtils = Any  // implement your cookie utils
 
 ---
 
+## Device Authorization Flow (TV / CLI)
+
+```kotlin
+// OAuth2 Device Flow — สำหรับ device ที่ไม่มี browser (Smart TV, CLI tools)
+
+data class DeviceCode(
+    val deviceCode: String,
+    val userCode: String,          // แสดงบนหน้าจอ: "ABCD-EFGH"
+    val verificationUri: String,   // ให้ user ไปกรอกบน phone
+    val expiresIn: Int,
+    val interval: Int              // polling interval (seconds)
+)
+
+// Step 1: Request device code
+suspend fun requestDeviceCode(clientId: String): DeviceCode {
+    val response = httpClient.post("https://accounts.google.com/o/oauth2/device/code") {
+        setBody(FormDataContent(Parameters.build {
+            append("client_id", clientId)
+            append("scope", "openid email profile")
+        }))
+    }
+    return response.body<DeviceCode>()
+}
+
+// Step 2: Poll for token (user กรอก code บน phone)
+suspend fun pollForToken(deviceCode: String, clientId: String): String? {
+    repeat(30) {  // max 5 min
+        delay(5_000)
+        val response = httpClient.post("https://oauth2.googleapis.com/token") {
+            setBody(FormDataContent(Parameters.build {
+                append("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+                append("device_code", deviceCode)
+                append("client_id", clientId)
+            }))
+        }
+        if (response.status.value == 200) {
+            return response.body<TokenResponse>().accessToken
+        }
+        // authorization_pending → keep polling
+        // expired → stop
+    }
+    return null
+}
+
+// แบบฝึกหัด Part 48
+/*
+1. เพิ่ม provider LINE Login ใน Spring Security OAuth2
+   LINE callback URL: https://access.line.me/oauth2/v2.1/token
+   User info: https://api.line.me/v2/profile
+
+2. Implement token rotation:
+   - ทุกครั้ง refresh → revoke old refresh token, issue new pair
+   - Store refresh token hash (bcrypt) ใน DB ไม่เก็บ plaintext
+   
+3. เพิ่ม "remember me" feature:
+   - Short JWT (15min) + Long refresh token (30 days)
+   - "Remember me" checkbox → refresh token 30 days
+   - No "remember me" → refresh token expires when browser closes
+
+4. ทดสอบ PKCE flow ด้วย Postman หรือ curl:
+   - Generate code_verifier (random 43-128 chars)
+   - code_challenge = BASE64URL(SHA256(code_verifier))
+   - Send code_challenge ใน authorization request
+   - Send code_verifier ใน token request
+*/
+```
+
+---
+
 ## สรุป Part 48
 
 ```

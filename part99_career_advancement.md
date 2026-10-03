@@ -420,6 +420,96 @@ Blogs:
 
 ---
 
+## Open Source Contribution
+
+```kotlin
+// ขั้นตอนการ contribute to open source
+
+// 1. เริ่มจาก "good first issue"
+// https://github.com/Kotlin/kotlinx.coroutines/issues?q=label%3A%22good+first+issue%22
+
+// 2. Fork → Clone → Branch → Code → PR
+
+// 3. ตัวอย่าง: เพิ่ม extension function ให้ kotlinx.coroutines
+// เสนอ PR: Flow<T>.retryWithExponentialBackoff()
+
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.delay
+import kotlin.math.min
+
+fun <T> Flow<T>.retryWithExponentialBackoff(
+    maxRetries: Long = 3,
+    initialDelayMs: Long = 100,
+    maxDelayMs: Long = 10_000,
+    multiplier: Double = 2.0
+): Flow<T> = retryWhen { cause, attempt ->
+    if (attempt >= maxRetries) return@retryWhen false
+    val delayMs = min(initialDelayMs * multiplier.pow(attempt.toInt()), maxDelayMs.toDouble()).toLong()
+    delay(delayMs)
+    true
+}
+
+private fun Double.pow(n: Int): Double = Math.pow(this, n.toDouble())
+
+// 4. เขียน tests คู่กัน (สิ่งที่ maintainer ต้องการเห็น)
+// 5. อัปเดต CHANGELOG.md
+// 6. ตอบ review comment อย่างสุภาพ, อธิบาย rationale
+
+// Mentoring Framework
+data class MentoringSession(
+    val menteeGoal: String,
+    val currentChallenge: String,
+    val actionItems: List<String>,
+    val nextCheckIn: java.time.LocalDate
+)
+
+fun runMentoringSession(mentee: String): MentoringSession {
+    // GROW model: Goal → Reality → Options → Way Forward
+    println("Session with $mentee")
+    println("G: What do you want to achieve this quarter?")
+    println("R: Where are you now? What's blocking you?")
+    println("O: What options have you considered?")
+    println("W: What will you do, by when?")
+    
+    return MentoringSession(
+        menteeGoal = "Become a mid-level developer",
+        currentChallenge = "Struggling with system design",
+        actionItems = listOf(
+            "Read DDIA chapters 1-3 this week",
+            "Design one system per week, then review together",
+            "Contribute one PR to open source this month"
+        ),
+        nextCheckIn = java.time.LocalDate.now().plusWeeks(2)
+    )
+}
+```
+
+---
+
+## แบบฝึกหัด Part 99
+
+```
+1. วาด System Design สำหรับ "Design a Notification Service"
+   ที่รับ 1M events/day ส่งผ่าน email + push + SMS
+   - Estimate throughput, storage
+   - High-level components
+   - Deep dive: retry logic, deduplication
+
+2. เขียน ADR สำหรับการตัดสินใจใช้ Kafka แทน RabbitMQ
+   ในระบบที่คุณกำลังทำงานอยู่
+
+3. Review โค้ดตัวอย่างนี้และเขียน review comment:
+   fun getUser(id: String) = userRepo.findById(id)!!
+
+4. สร้าง detekt.yml สำหรับ project ของตัวเอง
+   กำหนด threshold ที่สมเหตุสมผล
+
+5. เขียน blog post ภาษาไทยหัวข้อ:
+   "5 สิ่งที่ผมเรียนรู้จากการเขียน Kotlin 1 ปี"
+```
+
+---
+
 ## สรุป Part 99
 
 ```
